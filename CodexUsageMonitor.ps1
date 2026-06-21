@@ -42,6 +42,9 @@ if ($consoleWindow -ne [IntPtr]::Zero) {
 
 $CodexRoot = Join-Path $env:USERPROFILE ".codex"
 $SessionsRoot = Join-Path $CodexRoot "sessions"
+$LogsDatabasePath = Join-Path $CodexRoot "logs_2.sqlite"
+$ScriptDirectory = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+$RateLimitReaderPath = Join-Path $ScriptDirectory "Read-CodexRateLimits.py"
 $RefreshSeconds = 10
 
 $createdNew = $false
@@ -106,6 +109,33 @@ function Format-WindowName {
         return ("{0:N0}" -f ($minutes / 60)) + (U " \u5c0f\u65f6\u7a97\u53e3")
     }
     return ("{0:N0}" -f $minutes) + (U " \u5206\u949f\u7a97\u53e3")
+}
+
+function Get-PythonExecutable {
+    $candidates = @(
+        (Join-Path $env:USERPROFILE ".cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe")
+    )
+
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath $candidate) {
+            return $candidate
+        }
+    }
+
+    $python = Get-Command python.exe -ErrorAction SilentlyContinue
+    if ($null -ne $python) {
+        return $python.Source
+    }
+
+    return $null
+}
+
+function Get-ResetEpoch {
+    param($Limit)
+    if ($null -eq $Limit) { return $null }
+    if ($null -ne $Limit.resets_at) { return $Limit.resets_at }
+    if ($null -ne $Limit.reset_at) { return $Limit.reset_at }
+    return $null
 }
 
 function Get-LatestSessionFile {
@@ -200,6 +230,46 @@ function Get-LastTokenCountEvent {
     }
 
     return $null
+}
+
+function Get-LatestSqliteRateLimitEvent {
+    if (-not (Test-Path -LiteralPath $LogsDatabasePath)) {
+        return $null
+    }
+    if (-not (Test-Path -LiteralPath $RateLimitReaderPath)) {
+        return $null
+    }
+
+    $python = Get-PythonExecutable
+    if ($null -eq $python) {
+        return $null
+    }
+
+    try {
+        $json = & $python $RateLimitReaderPath $LogsDatabasePath 2>$null
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($json)) {
+            return $null
+        }
+
+        $snapshot = $json | ConvertFrom-Json
+        if ($null -eq $snapshot -or $null -eq $snapshot.rate_limits) {
+            return $null
+        }
+
+        return [pscustomobject]@{
+            Event       = [pscustomobject]@{
+                timestamp = $snapshot.timestamp
+                payload   = [pscustomobject]@{
+                    rate_limits = $snapshot.rate_limits
+                }
+            }
+            SessionFile = $null
+            Source      = "codex.rate_limits"
+        }
+    }
+    catch {
+        return $null
+    }
 }
 
 function New-Label {
@@ -428,8 +498,17 @@ function Get-LatestTokenCountEvent {
     return $null
 }
 
+function Get-CurrentRateLimitEvent {
+    $rateLimitEvent = Get-LatestSqliteRateLimitEvent
+    if ($null -ne $rateLimitEvent) {
+        return $rateLimitEvent
+    }
+
+    return Get-LatestTokenCountEvent
+}
+
 function Update-UsageView {
-    $tokenEvent = Get-LatestTokenCountEvent
+    $tokenEvent = Get-CurrentRateLimitEvent
 
     if ($null -eq $tokenEvent) {
         $status.Text = U "\u6ca1\u6709\u627e\u5230\u7528\u91cf\u6570\u636e"
@@ -473,12 +552,12 @@ function Update-UsageView {
 
     $primaryValue.Text = (U "\u5269\u4f59 ") + (Format-Percent $primaryRemain)
     $primaryValue.ForeColor = Pick-UsageColor $primaryRemain
-    $primaryDetail.Text = ((U "\u5df2\u7528 {0} / {1}") -f (Format-Percent $primaryUsed), (Format-ResetTime $primary.resets_at))
+    $primaryDetail.Text = ((U "\u5df2\u7528 {0} / {1}") -f (Format-Percent $primaryUsed), (Format-ResetTime (Get-ResetEpoch $primary)))
     Set-BarValue $primaryBar $primaryRemain
 
     $secondaryValue.Text = (U "\u5269\u4f59 ") + (Format-Percent $secondaryRemain)
     $secondaryValue.ForeColor = Pick-UsageColor $secondaryRemain
-    $secondaryDetail.Text = ((U "\u5df2\u7528 {0} / {1}") -f (Format-Percent $secondaryUsed), (Format-ResetTime $secondary.resets_at))
+    $secondaryDetail.Text = ((U "\u5df2\u7528 {0} / {1}") -f (Format-Percent $secondaryUsed), (Format-ResetTime (Get-ResetEpoch $secondary)))
     Set-BarValue $secondaryBar $secondaryRemain
 
     $plan = if ($limits.plan_type) { $limits.plan_type } else { "unknown plan" }

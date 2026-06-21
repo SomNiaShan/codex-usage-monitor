@@ -8,10 +8,10 @@ Windows 上的 Codex Desktop 剩余额度浮窗。
 
 读取内容：
 
-- `%USERPROFILE%\.codex\sessions` 下的 `rollout-*.jsonl`
-- `payload.type` 为 `token_count` 的事件
-- `rate_limits.primary` 和 `rate_limits.secondary`
-- 优先使用 `limit_id = codex` 的额度池
+- 优先只读 `%USERPROFILE%\.codex\logs_2.sqlite` 里的最新 `codex.rate_limits` 事件。
+- 如果读不到最新限额事件，再回退读取 `%USERPROFILE%\.codex\sessions` 下 `rollout-*.jsonl` 里的 `token_count` 事件。
+- 显示 `rate_limits.primary` 和 `rate_limits.secondary`。
+- 优先使用 `limit_id = codex` 的额度池。
 
 说明：
 
