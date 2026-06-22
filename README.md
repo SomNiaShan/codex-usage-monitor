@@ -10,6 +10,7 @@ This project is not affiliated with OpenAI. The bundled app icon is an original 
 
 - Shows primary and secondary quota windows with remaining percentage bars.
 - Updates quota data every 10 seconds.
+- Includes a manual refresh button.
 - Updates the clock every second.
 - Supports Chinese and English UI.
 - Stays on top by default, with a `Pin` toggle.
@@ -27,9 +28,9 @@ The single-file launcher extracts the supporting files to `%LOCALAPPDATA%\CodexU
 - `%USERPROFILE%\.codex\logs_2.sqlite`
   - latest `codex.rate_limits` events from Codex logs
 - `%USERPROFILE%\.codex\sessions\**\rollout-*.jsonl`
-  - latest `token_count` events as fallback/current-session data
+  - latest `token_count` events as fallback data when `codex.rate_limits` is unavailable
 
-The app prefers the `limit_id = codex` quota pool when multiple pools are found.
+The app prefers `codex.rate_limits` from `logs_2.sqlite`. Session `token_count` data is only a fallback.
 
 ## Requirements
 
