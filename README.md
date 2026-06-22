@@ -17,26 +17,11 @@ This project is not affiliated with OpenAI. The bundled app icon is an original 
 
 ## Install
 
-1. Download or clone this repository.
-2. Run PowerShell in the project folder:
+1. Download the latest release zip.
+2. Extract it.
+3. Double-click `Launch-CodexUsageMonitor.vbs`.
 
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\Install-Shortcut.ps1
-   ```
-
-3. Start it from the desktop shortcut `Codex Usage Monitor`.
-
-You can also run it directly:
-
-```powershell
-.\Start-CodexUsageMonitor.cmd
-```
-
-To remove the desktop shortcut:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\Install-Shortcut.ps1 -Remove
-```
+The `Launch-CodexUsageMonitor.vbs` launcher starts the monitor without flashing a console window.
 
 ## What It Reads
 
