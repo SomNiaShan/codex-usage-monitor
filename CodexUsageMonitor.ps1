@@ -396,7 +396,7 @@ $form = New-Object System.Windows.Forms.Form
 $form.Text = $AppTitle
 $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
 $form.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
-$form.ClientSize = New-Object System.Drawing.Size(360, 230)
+$form.ClientSize = New-Object System.Drawing.Size(324, 230)
 $form.TopMost = $true
 $form.Opacity = 1.0
 $form.BackColor = [System.Drawing.Color]::FromArgb(21, 23, 26)
@@ -413,10 +413,10 @@ $warn = [System.Drawing.Color]::FromArgb(251, 191, 36)
 $bad = [System.Drawing.Color]::FromArgb(248, 113, 113)
 $script:quotaAlertActive = $false
 
-$title = New-Label 16 12 214 26 (T "Title") 12 ([System.Drawing.FontStyle]::Bold)
-$status = New-Label 16 39 260 18 (T "Waiting") 8 ([System.Drawing.FontStyle]::Regular) $muted
+$title = New-Label 14 12 193 26 (T "Title") 12 ([System.Drawing.FontStyle]::Bold)
+$status = New-Label 14 39 234 18 (T "Waiting") 8 ([System.Drawing.FontStyle]::Regular) $muted
 $close = New-Object System.Windows.Forms.Button
-$close.SetBounds(320, 12, 24, 24)
+$close.SetBounds(288, 12, 22, 24)
 $close.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $close.FlatAppearance.BorderSize = 0
 $close.Text = "x"
@@ -426,7 +426,7 @@ $close.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.Font
 $close.Add_Click({ $form.Close() })
 
 $languageButton = New-Object System.Windows.Forms.Button
-$languageButton.SetBounds(234, 12, 48, 24)
+$languageButton.SetBounds(211, 12, 43, 24)
 $languageButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $languageButton.FlatAppearance.BorderSize = 0
 $languageButton.Text = "EN/" + (U "\u6587")
@@ -440,7 +440,7 @@ $languageButton.Add_Click({
 })
 
 $pin = New-Object System.Windows.Forms.Button
-$pin.SetBounds(286, 12, 32, 24)
+$pin.SetBounds(257, 12, 29, 24)
 $pin.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $pin.FlatAppearance.BorderSize = 0
 $pin.Text = T "Pin"
@@ -452,21 +452,21 @@ $pin.Add_Click({
     $pin.ForeColor = if ($form.TopMost) { $accent } else { $muted }
 })
 
-$quotaName = New-Label 16 64 160 20 (T "QuotaName") 10 ([System.Drawing.FontStyle]::Bold)
-$quotaValue = New-Label 176 56 168 32 "--" 18 ([System.Drawing.FontStyle]::Bold) $good
+$quotaName = New-Label 14 64 144 20 (T "QuotaName") 10 ([System.Drawing.FontStyle]::Bold)
+$quotaValue = New-Label 158 56 151 32 "--" 18 ([System.Drawing.FontStyle]::Bold) $good
 $quotaValue.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
 
-$primaryName = New-Label 16 100 210 18 (Format-WindowName 300 (T "PrimaryFallback")) 9 ([System.Drawing.FontStyle]::Bold)
-$primaryValue = New-Label 218 100 126 18 "--" 9 ([System.Drawing.FontStyle]::Bold) $good
+$primaryName = New-Label 14 100 189 18 (Format-WindowName 300 (T "PrimaryFallback")) 9 ([System.Drawing.FontStyle]::Bold)
+$primaryValue = New-Label 196 100 113 18 "--" 9 ([System.Drawing.FontStyle]::Bold) $good
 $primaryValue.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
-$primaryBar = New-Bar 16 124 328
-$primaryDetail = New-Label 16 138 328 18 (T "UsedResetUnknown") 8 ([System.Drawing.FontStyle]::Regular) $muted
+$primaryBar = New-Bar 14 124 295
+$primaryDetail = New-Label 14 138 295 18 (T "UsedResetUnknown") 8 ([System.Drawing.FontStyle]::Regular) $muted
 
-$secondaryName = New-Label 16 164 210 18 (Format-WindowName 10080 (T "SecondaryFallback")) 9 ([System.Drawing.FontStyle]::Bold)
-$secondaryValue = New-Label 218 164 126 18 "--" 9 ([System.Drawing.FontStyle]::Bold) $good
+$secondaryName = New-Label 14 164 189 18 (Format-WindowName 10080 (T "SecondaryFallback")) 9 ([System.Drawing.FontStyle]::Bold)
+$secondaryValue = New-Label 196 164 113 18 "--" 9 ([System.Drawing.FontStyle]::Bold) $good
 $secondaryValue.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
-$secondaryBar = New-Bar 16 188 328
-$secondaryDetail = New-Label 16 202 328 18 (T "UsedResetUnknown") 8 ([System.Drawing.FontStyle]::Regular) $muted
+$secondaryBar = New-Bar 14 188 295
+$secondaryDetail = New-Label 14 202 295 18 (T "UsedResetUnknown") 8 ([System.Drawing.FontStyle]::Regular) $muted
 
 $form.Controls.AddRange(@(
     $title, $status, $close, $languageButton, $pin, $quotaName, $quotaValue,
