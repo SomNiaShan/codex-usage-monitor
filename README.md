@@ -21,7 +21,7 @@ This project is not affiliated with OpenAI. The bundled app icon is an original 
 2. Extract it.
 3. Double-click `Launch-CodexUsageMonitor.vbs`.
 
-The `Launch-CodexUsageMonitor.vbs` launcher starts the monitor without flashing a console window.
+Release zips keep only `Launch-CodexUsageMonitor.vbs` at the top level. Supporting files live in the `app` folder. The launcher starts the monitor without flashing a console window.
 
 ## What It Reads
 
