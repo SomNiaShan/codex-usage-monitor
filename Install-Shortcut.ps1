@@ -13,6 +13,7 @@ else {
 }
 
 $launcherPath = Join-Path $scriptDirectory "Launch-CodexUsageMonitor.vbs"
+$iconPath = Join-Path $scriptDirectory "assets\codex-usage-monitor.ico"
 $desktopPath = [Environment]::GetFolderPath("Desktop")
 $shortcutPath = Join-Path $desktopPath ($ShortcutName + ".lnk")
 
@@ -36,7 +37,12 @@ $shortcut = $shell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = "$env:WINDIR\System32\wscript.exe"
 $shortcut.Arguments = "`"$launcherPath`""
 $shortcut.WorkingDirectory = $scriptDirectory
-$shortcut.IconLocation = "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe,0"
+$shortcut.IconLocation = if (Test-Path -LiteralPath $iconPath) {
+    $iconPath
+}
+else {
+    "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe,0"
+}
 $shortcut.Description = "Floating Codex usage quota monitor"
 $shortcut.Save()
 

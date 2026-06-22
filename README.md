@@ -4,6 +4,8 @@
 
 An unofficial Windows floating window for checking local Codex Desktop usage quota.
 
+This project is not affiliated with OpenAI. The bundled app icon is an original icon inspired by the Codex visual style, not an official OpenAI asset.
+
 ## Features
 
 - Shows primary and secondary quota windows with remaining percentage bars.

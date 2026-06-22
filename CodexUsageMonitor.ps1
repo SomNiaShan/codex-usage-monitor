@@ -129,6 +129,7 @@ $SessionsRoot = Join-Path $CodexRoot "sessions"
 $LogsDatabasePath = Join-Path $CodexRoot "logs_2.sqlite"
 $ScriptDirectory = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $RateLimitReaderPath = Join-Path $ScriptDirectory "Read-CodexRateLimits.py"
+$AppIconPath = Join-Path $ScriptDirectory "assets\codex-usage-monitor.ico"
 $RefreshSeconds = 10
 $ClockRefreshMilliseconds = 1000
 
@@ -454,6 +455,9 @@ $form.Opacity = 1.0
 $form.BackColor = [System.Drawing.Color]::FromArgb(21, 23, 26)
 $form.ForeColor = [System.Drawing.Color]::FromArgb(230, 235, 242)
 $form.Font = New-UiFont 9
+if (Test-Path -LiteralPath $AppIconPath) {
+    $form.Icon = New-Object System.Drawing.Icon($AppIconPath)
+}
 $form.ShowInTaskbar = $true
 
 $screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
