@@ -13,7 +13,7 @@ This project is not affiliated with OpenAI. The bundled app icon is an original 
 - Updates the clock every second.
 - Supports Chinese and English UI.
 - Stays on top by default, with a `Pin` toggle.
-- Reads local Codex data only; it does not write to Codex files and does not use auth tokens.
+- Reads quota through the local Codex `app-server` RPC; it does not write to Codex files or read auth tokens directly.
 
 ## Install
 
@@ -24,30 +24,29 @@ The single-file launcher extracts the supporting files to `%LOCALAPPDATA%\CodexU
 
 ## What It Reads
 
-- `%USERPROFILE%\.codex\logs_2.sqlite`
-  - latest `codex.rate_limits` events from Codex logs
+- `codex app-server --stdio`
+  - `account/rateLimits/read`
 
-The app uses only `codex.rate_limits` from `logs_2.sqlite` as its quota data source.
+The app uses only Codex's local app-server RPC as its quota data source.
 
 ## Requirements
 
 - Windows
-- Codex Desktop with local logs under `%USERPROFILE%\.codex`
+- Codex Desktop or Codex CLI installed and logged in
+- `codex.exe` available from `PATH` or from common OpenAI IDE extension folders
 - Windows PowerShell
-- Python, only for reading `logs_2.sqlite`
-  - The script first tries Codex's bundled Python runtime.
-  - If unavailable, it falls back to `python.exe` from `PATH`.
 
 ## Privacy
 
-This tool is local-only and read-only.
+This tool is read-only.
 
 It does not:
 
 - send telemetry
-- call network APIs
 - modify Codex files
 - read or use Codex auth tokens
+
+It asks the locally installed Codex app-server for `account/rateLimits/read`. Codex itself may contact OpenAI using its existing login state to refresh account quota data.
 
 ## Usage Notes
 

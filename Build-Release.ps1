@@ -42,7 +42,6 @@ function Convert-FileToCSharpString {
 }
 
 $monitorPayload = Convert-FileToCSharpString "CodexUsageMonitor.ps1"
-$readerPayload = Convert-FileToCSharpString "Read-CodexRateLimits.py"
 $iconPayload = Convert-FileToCSharpString "assets\codex-usage-monitor.ico"
 
 $source = @"
@@ -67,7 +66,6 @@ namespace CodexUsageMonitorLauncher
 
             Directory.CreateDirectory(assetsDir);
             WritePayload(Path.Combine(appDir, "CodexUsageMonitor.ps1"), MonitorPayload);
-            WritePayload(Path.Combine(appDir, "Read-CodexRateLimits.py"), ReaderPayload);
             WritePayload(Path.Combine(assetsDir, "codex-usage-monitor.ico"), IconPayload);
 
             string scriptPath = Path.Combine(appDir, "CodexUsageMonitor.ps1");
@@ -91,9 +89,6 @@ namespace CodexUsageMonitorLauncher
 
         private const string MonitorPayload =
 $monitorPayload;
-
-        private const string ReaderPayload =
-$readerPayload;
 
         private const string IconPayload =
 $iconPayload;

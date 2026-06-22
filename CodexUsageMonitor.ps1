@@ -133,13 +133,13 @@ if ($consoleWindow -ne [IntPtr]::Zero) {
 }
 
 $CodexRoot = Join-Path $env:USERPROFILE ".codex"
-$LogsDatabasePath = Join-Path $CodexRoot "logs_2.sqlite"
 $ScriptDirectory = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
-$RateLimitReaderPath = Join-Path $ScriptDirectory "Read-CodexRateLimits.py"
 $AppIconPath = Join-Path $ScriptDirectory "assets\codex-usage-monitor.ico"
 $RefreshSeconds = 10
 $ClockRefreshMilliseconds = 1000
 $script:appIcon = $null
+$script:codexExecutablePath = $null
+$script:codexExecutableChecked = $false
 
 if (Test-Path -LiteralPath $AppIconPath) {
     $script:appIcon = New-Object System.Drawing.Icon($AppIconPath)
@@ -221,20 +221,49 @@ function Format-WindowName {
     return ("{0:N0}{1}" -f $minutes, (U "\u5206\u949f\u989d\u5ea6"))
 }
 
-function Get-PythonExecutable {
+function Get-CodexExecutable {
+    if ($script:codexExecutableChecked) {
+        if (-not [string]::IsNullOrWhiteSpace($script:codexExecutablePath) -and (Test-Path -LiteralPath $script:codexExecutablePath)) {
+            return $script:codexExecutablePath
+        }
+        return $null
+    }
+
+    $script:codexExecutableChecked = $true
+
     $candidates = @(
-        (Join-Path $env:USERPROFILE ".cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe")
+        (Get-Command codex.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1),
+        (Get-Command codex -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1)
     )
 
     foreach ($candidate in $candidates) {
-        if (Test-Path -LiteralPath $candidate) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate)) {
+            $script:codexExecutablePath = $candidate
             return $candidate
         }
     }
 
-    $python = Get-Command python.exe -ErrorAction SilentlyContinue
-    if ($null -ne $python) {
-        return $python.Source
+    $extensionRoots = @(
+        (Join-Path $env:USERPROFILE ".vscode\extensions"),
+        (Join-Path $env:USERPROFILE ".vscode-insiders\extensions"),
+        (Join-Path $env:USERPROFILE ".cursor\extensions"),
+        (Join-Path $env:USERPROFILE ".windsurf\extensions")
+    )
+
+    foreach ($root in $extensionRoots) {
+        if (-not (Test-Path -LiteralPath $root)) {
+            continue
+        }
+
+        $candidate = Get-ChildItem -LiteralPath $root -Filter "codex.exe" -File -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "\\openai\.chatgpt-[^\\]+\\bin\\windows-[^\\]+\\codex\.exe$" } |
+            Sort-Object LastWriteTimeUtc -Descending |
+            Select-Object -ExpandProperty FullName -First 1
+
+        if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate)) {
+            $script:codexExecutablePath = $candidate
+            return $candidate
+        }
     }
 
     return $null
@@ -248,42 +277,180 @@ function Get-ResetEpoch {
     return $null
 }
 
-function Get-LatestSqliteRateLimitEvent {
-    if (-not (Test-Path -LiteralPath $LogsDatabasePath)) {
-        return $null
+function Convert-AppServerRateLimitWindow {
+    param($Window)
+    if ($null -eq $Window) { return $null }
+
+    $resetAt = $Window.resetsAt
+    $resetAfterSeconds = $null
+    if ($null -ne $resetAt) {
+        $resetAfterSeconds = [int64]$resetAt - [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     }
-    if (-not (Test-Path -LiteralPath $RateLimitReaderPath)) {
+
+    return [pscustomobject]@{
+        used_percent        = $Window.usedPercent
+        window_minutes      = $Window.windowDurationMins
+        reset_after_seconds = $resetAfterSeconds
+        reset_at            = $resetAt
+        resets_at           = $resetAt
+    }
+}
+
+function Convert-AppServerRateLimitSnapshot {
+    param($Snapshot)
+    if ($null -eq $Snapshot) { return $null }
+
+    return [pscustomobject]@{
+        limit_id           = $Snapshot.limitId
+        limit_name         = $Snapshot.limitName
+        plan_type          = $Snapshot.planType
+        allowed            = ($null -eq $Snapshot.rateLimitReachedType)
+        limit_reached      = $Snapshot.rateLimitReachedType
+        primary            = Convert-AppServerRateLimitWindow $Snapshot.primary
+        secondary          = Convert-AppServerRateLimitWindow $Snapshot.secondary
+        credits            = $Snapshot.credits
+        individual_limit   = $Snapshot.individualLimit
+    }
+}
+
+function Get-AppServerRateLimitEvent {
+    $codex = Get-CodexExecutable
+    if ($null -eq $codex) {
         return $null
     }
 
-    $python = Get-PythonExecutable
-    if ($null -eq $python) {
-        return $null
-    }
-
+    $process = $null
     try {
-        $json = & $python $RateLimitReaderPath $LogsDatabasePath 2>$null
-        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($json)) {
+        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+        if (@(".cmd", ".bat") -contains [System.IO.Path]::GetExtension($codex).ToLowerInvariant()) {
+            $startInfo.FileName = $env:ComSpec
+            $startInfo.Arguments = ('/d /c ""{0}" app-server --stdio"' -f $codex)
+        }
+        else {
+            $startInfo.FileName = $codex
+            $startInfo.Arguments = "app-server --stdio"
+        }
+        $startInfo.UseShellExecute = $false
+        $startInfo.RedirectStandardInput = $true
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        $startInfo.CreateNoWindow = $true
+        $startInfo.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+        $startInfo.StandardErrorEncoding = [System.Text.Encoding]::UTF8
+
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $startInfo
+
+        if (-not $process.Start()) {
             return $null
         }
 
-        $snapshot = $json | ConvertFrom-Json
-        if ($null -eq $snapshot -or $null -eq $snapshot.rate_limits) {
+        $errorReadTask = $process.StandardError.ReadToEndAsync()
+
+        $initializeRequest = @{
+            id     = 1
+            method = "initialize"
+            params = @{
+                clientInfo   = @{
+                    name    = "codex-usage-monitor"
+                    title   = "Codex Usage Monitor"
+                    version = "dev"
+                }
+                capabilities = @{}
+            }
+        } | ConvertTo-Json -Depth 8 -Compress
+
+        $rateLimitRequest = @{
+            id     = 2
+            method = "account/rateLimits/read"
+        } | ConvertTo-Json -Depth 4 -Compress
+
+        $process.StandardInput.WriteLine($initializeRequest)
+        $process.StandardInput.WriteLine($rateLimitRequest)
+        $process.StandardInput.Flush()
+
+        $deadline = [DateTime]::UtcNow.AddSeconds(15)
+        $readTask = $process.StandardOutput.ReadLineAsync()
+        $response = $null
+
+        while ([DateTime]::UtcNow -lt $deadline) {
+            if ($readTask.IsCompleted) {
+                $line = $readTask.Result
+                if ($null -eq $line) {
+                    break
+                }
+
+                try {
+                    $message = $line | ConvertFrom-Json
+                }
+                catch {
+                    $readTask = $process.StandardOutput.ReadLineAsync()
+                    continue
+                }
+
+                if ($message.id -eq 2) {
+                    $response = $message
+                    break
+                }
+
+                $readTask = $process.StandardOutput.ReadLineAsync()
+            }
+
+            if ($null -ne $response) {
+                break
+            }
+            if ($process.HasExited) {
+                break
+            }
+            Start-Sleep -Milliseconds 50
+        }
+
+        if ($null -eq $response -or $null -eq $response.result) {
+            return $null
+        }
+
+        $snapshot = $response.result.rateLimits
+        if ($null -ne $response.result.rateLimitsByLimitId) {
+            $codexLimit = $response.result.rateLimitsByLimitId.PSObject.Properties["codex"]
+            if ($null -ne $codexLimit -and $null -ne $codexLimit.Value) {
+                $snapshot = $codexLimit.Value
+            }
+        }
+
+        $rateLimits = Convert-AppServerRateLimitSnapshot $snapshot
+        if ($null -eq $rateLimits -or ($null -eq $rateLimits.primary -and $null -eq $rateLimits.secondary)) {
             return $null
         }
 
         return [pscustomobject]@{
             Event       = [pscustomobject]@{
-                timestamp = $snapshot.timestamp
+                timestamp = [DateTimeOffset]::UtcNow.ToString("o")
                 payload   = [pscustomobject]@{
-                    rate_limits = $snapshot.rate_limits
+                    rate_limits = $rateLimits
                 }
             }
-            Source      = "codex.rate_limits"
+            Source      = "codex.app-server.account/rateLimits/read"
         }
     }
     catch {
         return $null
+    }
+    finally {
+        if ($null -ne $process) {
+            try {
+                if (-not $process.HasExited) {
+                    $process.StandardInput.Close()
+                    if (-not $process.WaitForExit(500)) {
+                        $process.Kill()
+                    }
+                }
+            }
+            catch {}
+            try {
+                $process.Dispose()
+            }
+            catch {}
+        }
     }
 }
 
@@ -539,7 +706,7 @@ function Pick-UsageColor {
 }
 
 function Get-CurrentRateLimitEvent {
-    return Get-LatestSqliteRateLimitEvent
+    return Get-AppServerRateLimitEvent
 }
 
 function Update-UsageView {
