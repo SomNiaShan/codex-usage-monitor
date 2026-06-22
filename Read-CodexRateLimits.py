@@ -18,25 +18,31 @@ def _normalize_limit(limit):
     }
 
 
-def _extract_event(body):
+def _extract_rate_limit_events(body):
     marker = "websocket event:"
-    idx = body.find(marker)
-    if idx < 0:
-        return None
+    decoder = json.JSONDecoder()
+    search_from = 0
 
-    payload = body[idx + len(marker) :].strip()
-    start = payload.find("{")
-    if start < 0:
-        return None
+    while True:
+        idx = body.find(marker, search_from)
+        if idx < 0:
+            return
 
-    try:
-        event = json.loads(payload[start:])
-    except json.JSONDecodeError:
-        return None
+        payload_start = idx + len(marker)
+        json_offset = body.find("{", payload_start)
+        if json_offset < 0:
+            return
 
-    if event.get("type") != "codex.rate_limits":
-        return None
-    return event
+        try:
+            event, end = decoder.raw_decode(body[json_offset:])
+        except json.JSONDecodeError:
+            search_from = payload_start
+            continue
+
+        if isinstance(event, dict) and event.get("type") == "codex.rate_limits":
+            yield event
+
+        search_from = json_offset + max(end, 1)
 
 
 def main():
@@ -52,17 +58,18 @@ def main():
             from logs
             where target = 'codex_api::endpoint::responses_websocket'
               and feedback_log_body like '%codex.rate_limits%'
-            order by id desc
-            limit 50
+            order by ts desc, id desc
+            limit 200
             """
         ).fetchall()
     finally:
         con.close()
 
     for _row_id, ts, body in rows:
-        event = _extract_event(body or "")
-        if event is None:
+        events = list(_extract_rate_limit_events(body or ""))
+        if not events:
             continue
+        event = events[-1]
 
         limits = event.get("rate_limits") or {}
         ts_seconds = ts / 1000 if ts and ts > 10**12 else ts

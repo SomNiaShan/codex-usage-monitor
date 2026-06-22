@@ -33,6 +33,58 @@ function U {
     })
 }
 
+$script:uiLanguage = "zh"
+
+function T {
+    param([string]$Key)
+
+    if ($script:uiLanguage -eq "en") {
+        switch ($Key) {
+            "Title" { return "Codex Quota" }
+            "Waiting" { return "Waiting for usage data" }
+            "NoData" { return "No usage data found" }
+            "QuotaName" { return "Remaining quota" }
+            "Pin" { return "Pin" }
+            "OpenLogs" { return "Open log folder" }
+            "Exit" { return "Exit" }
+            "PrimaryFallback" { return "Primary quota window" }
+            "SecondaryFallback" { return "Secondary quota window" }
+            "RemainingPrefix" { return "Remaining " }
+            "UsedResetUnknown" { return "Used -- / reset --" }
+            "UsedResetFormat" { return "Used {0} / {1}" }
+            "ResetUnknown" { return "reset --" }
+            "ResetFormat" { return "reset {0:MM-dd HH:mm}" }
+            "QuotaLowTitle" { return "Codex quota reminder" }
+            "QuotaLowMessage" { return "Codex remaining quota is very low: {0}." }
+            "UnknownPlan" { return "unknown plan" }
+            "UnknownLimit" { return "unknown limit" }
+            default { return $Key }
+        }
+    }
+
+    switch ($Key) {
+        "Title" { return "Codex " + (U "\u5269\u4f59\u989d\u5ea6") }
+        "Waiting" { return U "\u7b49\u5f85\u7528\u91cf\u6570\u636e" }
+        "NoData" { return U "\u6ca1\u6709\u627e\u5230\u7528\u91cf\u6570\u636e" }
+        "QuotaName" { return U "\u5269\u4f59\u989d\u5ea6" }
+        "Pin" { return U "\u9876" }
+        "OpenLogs" { return U "\u6253\u5f00\u65e5\u5fd7\u6587\u4ef6\u5939" }
+        "Exit" { return U "\u9000\u51fa" }
+        "PrimaryFallback" { return U "\u4e3b\u989d\u5ea6\u7a97\u53e3" }
+        "SecondaryFallback" { return U "\u6b21\u989d\u5ea6\u7a97\u53e3" }
+        "RemainingPrefix" { return U "\u5269\u4f59 " }
+        "UsedResetUnknown" { return U "\u5df2\u7528 -- / \u91cd\u7f6e --" }
+        "UsedResetFormat" { return U "\u5df2\u7528 {0} / {1}" }
+        "ResetUnknown" { return U "\u91cd\u7f6e --" }
+        "ResetFormat" { return (U "\u91cd\u7f6e") + " {0:MM-dd HH:mm}" }
+        "QuotaLowTitle" { return "Codex " + (U "\u989d\u5ea6\u63d0\u9192") }
+        "QuotaLowMessage" { return "Codex " + (U "\u5269\u4f59\u989d\u5ea6\u8fc7\u4f4e\uff1a{0}\u3002") }
+        "UnknownPlan" { return "unknown plan" }
+        "UnknownLimit" { return "unknown limit" }
+        default { return $Key }
+    }
+}
+
 $AppTitle = "Codex " + (U "\u7528\u91cf\u76d1\u63a7")
 
 $consoleWindow = [CodexUsageWindowTools]::GetConsoleWindow()
@@ -81,13 +133,13 @@ function Format-Integer {
 
 function Format-ResetTime {
     param($EpochSeconds)
-    if ($null -eq $EpochSeconds) { return (U "\u91cd\u7f6e --") }
+    if ($null -eq $EpochSeconds) { return (T "ResetUnknown") }
     try {
         $local = [DateTimeOffset]::FromUnixTimeSeconds([int64]$EpochSeconds).LocalDateTime
-        return (((U "\u91cd\u7f6e") + " {0:MM-dd HH:mm}") -f $local)
+        return ((T "ResetFormat") -f $local)
     }
     catch {
-        return (U "\u91cd\u7f6e --")
+        return (T "ResetUnknown")
     }
 }
 
@@ -100,13 +152,25 @@ function Format-WindowName {
     if ($null -eq $WindowMinutes) { return $Fallback }
     $minutes = [double]$WindowMinutes
     if ($minutes -ge 10080 -and ($minutes % 10080) -eq 0) {
+        if ($script:uiLanguage -eq "en") {
+            return ("{0:N0}-week window" -f ($minutes / 10080))
+        }
         return ("{0:N0}" -f ($minutes / 10080)) + (U " \u5468\u7a97\u53e3")
     }
     if ($minutes -ge 1440 -and ($minutes % 1440) -eq 0) {
+        if ($script:uiLanguage -eq "en") {
+            return ("{0:N0}-day window" -f ($minutes / 1440))
+        }
         return ("{0:N0}" -f ($minutes / 1440)) + (U " \u5929\u7a97\u53e3")
     }
     if ($minutes -ge 60 -and ($minutes % 60) -eq 0) {
+        if ($script:uiLanguage -eq "en") {
+            return ("{0:N0}-hour window" -f ($minutes / 60))
+        }
         return ("{0:N0}" -f ($minutes / 60)) + (U " \u5c0f\u65f6\u7a97\u53e3")
+    }
+    if ($script:uiLanguage -eq "en") {
+        return ("{0:N0}-minute window" -f $minutes)
     }
     return ("{0:N0}" -f $minutes) + (U " \u5206\u949f\u7a97\u53e3")
 }
@@ -349,8 +413,8 @@ $warn = [System.Drawing.Color]::FromArgb(251, 191, 36)
 $bad = [System.Drawing.Color]::FromArgb(248, 113, 113)
 $script:quotaAlertActive = $false
 
-$title = New-Label 16 12 260 26 ("Codex " + (U "\u5269\u4f59\u989d\u5ea6")) 12 ([System.Drawing.FontStyle]::Bold)
-$status = New-Label 16 39 260 18 (U "\u7b49\u5f85\u7528\u91cf\u6570\u636e") 8 ([System.Drawing.FontStyle]::Regular) $muted
+$title = New-Label 16 12 214 26 (T "Title") 12 ([System.Drawing.FontStyle]::Bold)
+$status = New-Label 16 39 260 18 (T "Waiting") 8 ([System.Drawing.FontStyle]::Regular) $muted
 $close = New-Object System.Windows.Forms.Button
 $close.SetBounds(320, 12, 24, 24)
 $close.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
@@ -361,11 +425,25 @@ $close.BackColor = [System.Drawing.Color]::FromArgb(31, 34, 38)
 $close.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
 $close.Add_Click({ $form.Close() })
 
+$languageButton = New-Object System.Windows.Forms.Button
+$languageButton.SetBounds(234, 12, 48, 24)
+$languageButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$languageButton.FlatAppearance.BorderSize = 0
+$languageButton.Text = "EN/" + (U "\u6587")
+$languageButton.ForeColor = $muted
+$languageButton.BackColor = [System.Drawing.Color]::FromArgb(31, 34, 38)
+$languageButton.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Bold)
+$languageButton.Add_Click({
+    $script:uiLanguage = if ($script:uiLanguage -eq "en") { "zh" } else { "en" }
+    Update-StaticText
+    Update-UsageView
+})
+
 $pin = New-Object System.Windows.Forms.Button
-$pin.SetBounds(290, 12, 24, 24)
+$pin.SetBounds(286, 12, 32, 24)
 $pin.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $pin.FlatAppearance.BorderSize = 0
-$pin.Text = U "\u9876"
+$pin.Text = T "Pin"
 $pin.ForeColor = $accent
 $pin.BackColor = [System.Drawing.Color]::FromArgb(31, 34, 38)
 $pin.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Bold)
@@ -374,24 +452,24 @@ $pin.Add_Click({
     $pin.ForeColor = if ($form.TopMost) { $accent } else { $muted }
 })
 
-$quotaName = New-Label 16 64 160 20 (U "\u5269\u4f59\u989d\u5ea6") 10 ([System.Drawing.FontStyle]::Bold)
+$quotaName = New-Label 16 64 160 20 (T "QuotaName") 10 ([System.Drawing.FontStyle]::Bold)
 $quotaValue = New-Label 176 56 168 32 "--" 18 ([System.Drawing.FontStyle]::Bold) $good
 $quotaValue.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
 
-$primaryName = New-Label 16 100 210 18 (U "5 \u5c0f\u65f6\u7a97\u53e3") 9 ([System.Drawing.FontStyle]::Bold)
+$primaryName = New-Label 16 100 210 18 (Format-WindowName 300 (T "PrimaryFallback")) 9 ([System.Drawing.FontStyle]::Bold)
 $primaryValue = New-Label 218 100 126 18 "--" 9 ([System.Drawing.FontStyle]::Bold) $good
 $primaryValue.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
 $primaryBar = New-Bar 16 124 328
-$primaryDetail = New-Label 16 138 328 18 ((U "\u5df2\u7528 -- / \u91cd\u7f6e --")) 8 ([System.Drawing.FontStyle]::Regular) $muted
+$primaryDetail = New-Label 16 138 328 18 (T "UsedResetUnknown") 8 ([System.Drawing.FontStyle]::Regular) $muted
 
-$secondaryName = New-Label 16 164 210 18 (U "1 \u5468\u7a97\u53e3") 9 ([System.Drawing.FontStyle]::Bold)
+$secondaryName = New-Label 16 164 210 18 (Format-WindowName 10080 (T "SecondaryFallback")) 9 ([System.Drawing.FontStyle]::Bold)
 $secondaryValue = New-Label 218 164 126 18 "--" 9 ([System.Drawing.FontStyle]::Bold) $good
 $secondaryValue.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
 $secondaryBar = New-Bar 16 188 328
-$secondaryDetail = New-Label 16 202 328 18 ((U "\u5df2\u7528 -- / \u91cd\u7f6e --")) 8 ([System.Drawing.FontStyle]::Regular) $muted
+$secondaryDetail = New-Label 16 202 328 18 (T "UsedResetUnknown") 8 ([System.Drawing.FontStyle]::Regular) $muted
 
 $form.Controls.AddRange(@(
-    $title, $status, $close, $pin, $quotaName, $quotaValue,
+    $title, $status, $close, $languageButton, $pin, $quotaName, $quotaValue,
     $primaryName, $primaryValue, $primaryBar, $primaryDetail,
     $secondaryName, $secondaryValue, $secondaryBar, $secondaryDetail
 ))
@@ -430,15 +508,29 @@ foreach ($target in $dragTargets) {
 }
 
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
-$openSessions = $menu.Items.Add((U "\u6253\u5f00\u65e5\u5fd7\u6587\u4ef6\u5939"))
+$openSessions = $menu.Items.Add((T "OpenLogs"))
 $openSessions.Add_Click({
     if (Test-Path -LiteralPath $SessionsRoot) {
         Start-Process explorer.exe -ArgumentList "`"$SessionsRoot`""
     }
 })
-$exitItem = $menu.Items.Add((U "\u9000\u51fa"))
+$exitItem = $menu.Items.Add((T "Exit"))
 $exitItem.Add_Click({ $form.Close() })
 $form.ContextMenuStrip = $menu
+
+function Update-StaticText {
+    $title.Text = T "Title"
+    $status.Text = T "Waiting"
+    $quotaName.Text = T "QuotaName"
+    $pin.Text = T "Pin"
+    $languageButton.Text = "EN/" + (U "\u6587")
+    $openSessions.Text = T "OpenLogs"
+    $exitItem.Text = T "Exit"
+    $primaryName.Text = Format-WindowName 300 (T "PrimaryFallback")
+    $secondaryName.Text = Format-WindowName 10080 (T "SecondaryFallback")
+    $primaryDetail.Text = T "UsedResetUnknown"
+    $secondaryDetail.Text = T "UsedResetUnknown"
+}
 
 function Pick-UsageColor {
     param($RemainingPercent)
@@ -498,26 +590,52 @@ function Get-LatestTokenCountEvent {
     return $null
 }
 
+function Get-EventTimestamp {
+    param($TokenEvent)
+
+    if ($null -eq $TokenEvent -or $null -eq $TokenEvent.Event -or $null -eq $TokenEvent.Event.timestamp) {
+        return [DateTimeOffset]::MinValue
+    }
+
+    try {
+        return [DateTimeOffset]::Parse([string]$TokenEvent.Event.timestamp)
+    }
+    catch {
+        return [DateTimeOffset]::MinValue
+    }
+}
+
 function Get-CurrentRateLimitEvent {
     $rateLimitEvent = Get-LatestSqliteRateLimitEvent
-    if ($null -ne $rateLimitEvent) {
+    $tokenCountEvent = Get-LatestTokenCountEvent
+
+    if ($null -eq $rateLimitEvent) {
+        return $tokenCountEvent
+    }
+    if ($null -eq $tokenCountEvent) {
         return $rateLimitEvent
     }
 
-    return Get-LatestTokenCountEvent
+    if ((Get-EventTimestamp $tokenCountEvent) -gt (Get-EventTimestamp $rateLimitEvent)) {
+        return $tokenCountEvent
+    }
+
+    return $rateLimitEvent
 }
 
 function Update-UsageView {
     $tokenEvent = Get-CurrentRateLimitEvent
 
     if ($null -eq $tokenEvent) {
-        $status.Text = U "\u6ca1\u6709\u627e\u5230\u7528\u91cf\u6570\u636e"
+        $status.Text = T "NoData"
         $status.ForeColor = $warn
         $quotaValue.Text = "--"
         $primaryValue.Text = "--"
         $secondaryValue.Text = "--"
-        $primaryDetail.Text = U "\u5df2\u7528 -- / \u91cd\u7f6e --"
-        $secondaryDetail.Text = U "\u5df2\u7528 -- / \u91cd\u7f6e --"
+        $primaryName.Text = Format-WindowName 300 (T "PrimaryFallback")
+        $secondaryName.Text = Format-WindowName 10080 (T "SecondaryFallback")
+        $primaryDetail.Text = T "UsedResetUnknown"
+        $secondaryDetail.Text = T "UsedResetUnknown"
         Set-BarValue $primaryBar $null
         Set-BarValue $secondaryBar $null
         return
@@ -533,8 +651,8 @@ function Update-UsageView {
     $primaryRemain = if ($null -ne $primaryUsed) { 100.0 - $primaryUsed } else { $null }
     $secondaryRemain = if ($null -ne $secondaryUsed) { 100.0 - $secondaryUsed } else { $null }
 
-    $primaryName.Text = Format-WindowName $primary.window_minutes (U "\u4e3b\u989d\u5ea6\u7a97\u53e3")
-    $secondaryName.Text = Format-WindowName $secondary.window_minutes (U "\u6b21\u989d\u5ea6\u7a97\u53e3")
+    $primaryName.Text = Format-WindowName $primary.window_minutes (T "PrimaryFallback")
+    $secondaryName.Text = Format-WindowName $secondary.window_minutes (T "SecondaryFallback")
 
     $quotaRemain = $null
     if ($null -ne $primaryRemain -and $null -ne $secondaryRemain) {
@@ -550,18 +668,18 @@ function Update-UsageView {
     $quotaValue.Text = Format-Percent $quotaRemain
     $quotaValue.ForeColor = Pick-UsageColor $quotaRemain
 
-    $primaryValue.Text = (U "\u5269\u4f59 ") + (Format-Percent $primaryRemain)
+    $primaryValue.Text = (T "RemainingPrefix") + (Format-Percent $primaryRemain)
     $primaryValue.ForeColor = Pick-UsageColor $primaryRemain
-    $primaryDetail.Text = ((U "\u5df2\u7528 {0} / {1}") -f (Format-Percent $primaryUsed), (Format-ResetTime (Get-ResetEpoch $primary)))
+    $primaryDetail.Text = ((T "UsedResetFormat") -f (Format-Percent $primaryUsed), (Format-ResetTime (Get-ResetEpoch $primary)))
     Set-BarValue $primaryBar $primaryRemain
 
-    $secondaryValue.Text = (U "\u5269\u4f59 ") + (Format-Percent $secondaryRemain)
+    $secondaryValue.Text = (T "RemainingPrefix") + (Format-Percent $secondaryRemain)
     $secondaryValue.ForeColor = Pick-UsageColor $secondaryRemain
-    $secondaryDetail.Text = ((U "\u5df2\u7528 {0} / {1}") -f (Format-Percent $secondaryUsed), (Format-ResetTime (Get-ResetEpoch $secondary)))
+    $secondaryDetail.Text = ((T "UsedResetFormat") -f (Format-Percent $secondaryUsed), (Format-ResetTime (Get-ResetEpoch $secondary)))
     Set-BarValue $secondaryBar $secondaryRemain
 
-    $plan = if ($limits.plan_type) { $limits.plan_type } else { "unknown plan" }
-    $limitId = if ($limits.limit_id) { $limits.limit_id } else { "unknown limit" }
+    $plan = if ($limits.plan_type) { $limits.plan_type } else { T "UnknownPlan" }
+    $limitId = if ($limits.limit_id) { $limits.limit_id } else { T "UnknownLimit" }
     $status.Text = ("{0}/{1} | {2:HH:mm:ss}" -f $plan, $limitId, (Get-Date))
     $status.ForeColor = $muted
 
@@ -570,8 +688,8 @@ function Update-UsageView {
             $script:quotaAlertActive = $true
             [System.Windows.Forms.MessageBox]::Show(
                 $form,
-                (("Codex " + (U "\u5269\u4f59\u989d\u5ea6\u8fc7\u4f4e\uff1a{0}\u3002")) -f (Format-Percent $quotaRemain)),
-                ("Codex " + (U "\u989d\u5ea6\u63d0\u9192")),
+                ((T "QuotaLowMessage") -f (Format-Percent $quotaRemain)),
+                (T "QuotaLowTitle"),
                 [System.Windows.Forms.MessageBoxButtons]::OK,
                 [System.Windows.Forms.MessageBoxIcon]::Warning
             ) | Out-Null
