@@ -51,7 +51,6 @@ function T {
             "NoData" { return "No usage data found" }
             "QuotaName" { return "Remaining quota" }
             "Pin" { return "Pin" }
-            "Refresh" { return "Refresh" }
             "OpenLogs" { return "Open log folder" }
             "Exit" { return "Exit" }
             "PrimaryFallback" { return "Primary" }
@@ -73,7 +72,6 @@ function T {
         "NoData" { return U "\u6ca1\u6709\u627e\u5230\u7528\u91cf\u6570\u636e" }
         "QuotaName" { return U "\u5269\u4f59\u989d\u5ea6" }
         "Pin" { return U "\u9876" }
-        "Refresh" { return U "\u5237\u65b0" }
         "OpenLogs" { return U "\u6253\u5f00\u65e5\u5fd7\u6587\u4ef6\u5939" }
         "Exit" { return U "\u9000\u51fa" }
         "PrimaryFallback" { return U "\u4e3b\u989d\u5ea6" }
@@ -469,10 +467,6 @@ $valueWidth = 124
 $nameValueGap = 8
 $valueX = $windowWidth - $outerPadding - $valueWidth
 $nameWidth = $valueX - $outerPadding - $nameValueGap
-$refreshButtonWidth = 22
-$refreshButtonHeight = 20
-$refreshButtonX = $windowWidth - $outerPadding - $refreshButtonWidth
-$statusWidth = $refreshButtonX - $outerPadding - $buttonGap
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = $AppTitle
@@ -501,20 +495,7 @@ $script:quotaAlertActive = $false
 $script:statusState = "Waiting"
 
 $title = New-Label $outerPadding 12 $titleWidth 26 (T "Title") 12 ([System.Drawing.FontStyle]::Bold)
-$status = New-Label $outerPadding 39 $statusWidth 18 (T "Waiting") 8 ([System.Drawing.FontStyle]::Regular) $muted
-$refreshButton = New-Object System.Windows.Forms.Button
-$refreshButton.SetBounds($refreshButtonX, 38, $refreshButtonWidth, $refreshButtonHeight)
-$refreshButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$refreshButton.FlatAppearance.BorderSize = 0
-$refreshButton.Text = U "\u21bb"
-$refreshButton.ForeColor = $muted
-$refreshButton.BackColor = [System.Drawing.Color]::FromArgb(31, 34, 38)
-$refreshButton.Font = New-UiFont 9 ([System.Drawing.FontStyle]::Bold)
-$refreshButton.Add_Click({ Update-UsageView })
-
-$toolTip = New-Object System.Windows.Forms.ToolTip
-$toolTip.SetToolTip($refreshButton, (T "Refresh"))
-
+$status = New-Label $outerPadding 39 $contentWidth 18 (T "Waiting") 8 ([System.Drawing.FontStyle]::Regular) $muted
 $close = New-Object System.Windows.Forms.Button
 $close.SetBounds($closeButtonX, 12, $closeButtonWidth, $topButtonHeight)
 $close.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
@@ -565,7 +546,7 @@ $secondaryBar = New-Bar $outerPadding 152 $contentWidth
 $secondaryDetail = New-Label $outerPadding 166 $contentWidth 18 (T "ResetUnknown") 8 ([System.Drawing.FontStyle]::Regular) $muted
 
 $form.Controls.AddRange(@(
-    $title, $status, $refreshButton, $close, $languageButton, $pin,
+    $title, $status, $close, $languageButton, $pin,
     $primaryName, $primaryValue, $primaryBar, $primaryDetail,
     $secondaryName, $secondaryValue, $secondaryBar, $secondaryDetail
 ))
@@ -619,7 +600,6 @@ function Update-StaticText {
     Update-StatusClock
     $pin.Text = T "Pin"
     $languageButton.Text = Get-LanguageButtonText
-    $toolTip.SetToolTip($refreshButton, (T "Refresh"))
     $openSessions.Text = T "OpenLogs"
     $exitItem.Text = T "Exit"
     $primaryName.Text = Format-WindowName 300 (T "PrimaryFallback")

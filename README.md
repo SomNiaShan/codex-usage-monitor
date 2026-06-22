@@ -10,7 +10,6 @@ This project is not affiliated with OpenAI. The bundled app icon is an original 
 
 - Shows primary and secondary quota windows with remaining percentage bars.
 - Updates quota data every 10 seconds.
-- Includes a manual refresh button.
 - Updates the clock every second.
 - Supports Chinese and English UI.
 - Stays on top by default, with a `Pin` toggle.
