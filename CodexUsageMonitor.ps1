@@ -98,6 +98,7 @@ $LogsDatabasePath = Join-Path $CodexRoot "logs_2.sqlite"
 $ScriptDirectory = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $RateLimitReaderPath = Join-Path $ScriptDirectory "Read-CodexRateLimits.py"
 $RefreshSeconds = 10
+$ClockRefreshMilliseconds = 1000
 
 $createdNew = $false
 $script:singleInstanceMutex = [System.Threading.Mutex]::new($true, "Local\CodexUsageMonitorFloatingQuota", [ref]$createdNew)
@@ -412,6 +413,7 @@ $good = [System.Drawing.Color]::FromArgb(74, 222, 128)
 $warn = [System.Drawing.Color]::FromArgb(251, 191, 36)
 $bad = [System.Drawing.Color]::FromArgb(248, 113, 113)
 $script:quotaAlertActive = $false
+$script:statusState = "Waiting"
 
 $title = New-Label 14 12 193 26 (T "Title") 12 ([System.Drawing.FontStyle]::Bold)
 $status = New-Label 14 39 234 18 (T "Waiting") 8 ([System.Drawing.FontStyle]::Regular) $muted
@@ -516,7 +518,7 @@ $form.ContextMenuStrip = $menu
 
 function Update-StaticText {
     $title.Text = T "Title"
-    $status.Text = T "Waiting"
+    Update-StatusClock
     $pin.Text = T "Pin"
     $languageButton.Text = "EN/" + (U "\u6587")
     $openSessions.Text = T "OpenLogs"
@@ -525,6 +527,24 @@ function Update-StaticText {
     $secondaryName.Text = Format-WindowName 10080 (T "SecondaryFallback")
     $primaryDetail.Text = T "UsedResetUnknown"
     $secondaryDetail.Text = T "UsedResetUnknown"
+}
+
+function Update-StatusClock {
+    $timeText = "{0:HH:mm:ss}" -f (Get-Date)
+    switch ($script:statusState) {
+        "Waiting" {
+            $status.Text = "{0} | {1}" -f (T "Waiting"), $timeText
+            return
+        }
+        "NoData" {
+            $status.Text = "{0} | {1}" -f (T "NoData"), $timeText
+            return
+        }
+        default {
+            $status.Text = $timeText
+            return
+        }
+    }
 }
 
 function Pick-UsageColor {
@@ -622,7 +642,8 @@ function Update-UsageView {
     $tokenEvent = Get-CurrentRateLimitEvent
 
     if ($null -eq $tokenEvent) {
-        $status.Text = T "NoData"
+        $script:statusState = "NoData"
+        Update-StatusClock
         $status.ForeColor = $warn
         $primaryValue.Text = "--"
         $secondaryValue.Text = "--"
@@ -669,7 +690,8 @@ function Update-UsageView {
     $secondaryDetail.Text = ((T "UsedResetFormat") -f (Format-Percent $secondaryUsed), (Format-ResetTime (Get-ResetEpoch $secondary)))
     Set-BarValue $secondaryBar $secondaryRemain
 
-    $status.Text = ("{0:HH:mm:ss}" -f (Get-Date))
+    $script:statusState = "Clock"
+    Update-StatusClock
     $status.ForeColor = $muted
 
     if ($null -ne $quotaRemain -and $quotaRemain -lt 5) {
@@ -698,13 +720,22 @@ $timer.Add_Tick({
     Update-UsageView
 })
 
+$clockTimer = New-Object System.Windows.Forms.Timer
+$clockTimer.Interval = $ClockRefreshMilliseconds
+$clockTimer.Add_Tick({
+    Update-StatusClock
+})
+
 $form.Add_Shown({
+    Update-StatusClock
     Update-UsageView
+    $clockTimer.Start()
     $timer.Start()
 })
 
 $form.Add_FormClosing({
     $timer.Stop()
+    $clockTimer.Stop()
     if ($null -ne $script:singleInstanceMutex) {
         $script:singleInstanceMutex.ReleaseMutex()
         $script:singleInstanceMutex.Dispose()
