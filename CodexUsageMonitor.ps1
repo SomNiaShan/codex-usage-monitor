@@ -20,6 +20,12 @@ public static class CodexUsageWindowTools
 
     [DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll", CharSet=CharSet.Auto)]
+    public static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("shell32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+    public static extern int SetCurrentProcessExplicitAppUserModelID(string appID);
 }
 "@
 
@@ -118,6 +124,8 @@ function New-UiFont {
 $script:uiFontFamily = Get-UiFontFamily
 
 $AppTitle = "Codex " + (U "\u7528\u91cf\u76d1\u63a7")
+$AppUserModelId = "SomNiaShan.CodexUsageMonitor"
+[CodexUsageWindowTools]::SetCurrentProcessExplicitAppUserModelID($AppUserModelId) | Out-Null
 
 $consoleWindow = [CodexUsageWindowTools]::GetConsoleWindow()
 if ($consoleWindow -ne [IntPtr]::Zero) {
@@ -132,6 +140,11 @@ $RateLimitReaderPath = Join-Path $ScriptDirectory "Read-CodexRateLimits.py"
 $AppIconPath = Join-Path $ScriptDirectory "assets\codex-usage-monitor.ico"
 $RefreshSeconds = 10
 $ClockRefreshMilliseconds = 1000
+$script:appIcon = $null
+
+if (Test-Path -LiteralPath $AppIconPath) {
+    $script:appIcon = New-Object System.Drawing.Icon($AppIconPath)
+}
 
 $createdNew = $false
 $script:singleInstanceMutex = [System.Threading.Mutex]::new($true, "Local\CodexUsageMonitorFloatingQuota", [ref]$createdNew)
@@ -426,6 +439,16 @@ function Set-BarValue {
     $fill.BackColor = Pick-UsageColor $remaining
 }
 
+function Set-WindowIcon {
+    if ($null -eq $script:appIcon -or $null -eq $form -or -not $form.IsHandleCreated) {
+        return
+    }
+
+    $form.Icon = $script:appIcon
+    [CodexUsageWindowTools]::SendMessage($form.Handle, 0x80, [IntPtr]0, $script:appIcon.Handle) | Out-Null
+    [CodexUsageWindowTools]::SendMessage($form.Handle, 0x80, [IntPtr]1, $script:appIcon.Handle) | Out-Null
+}
+
 $windowWidth = 252
 $windowHeight = 190
 $outerPadding = 12
@@ -455,8 +478,8 @@ $form.Opacity = 1.0
 $form.BackColor = [System.Drawing.Color]::FromArgb(21, 23, 26)
 $form.ForeColor = [System.Drawing.Color]::FromArgb(230, 235, 242)
 $form.Font = New-UiFont 9
-if (Test-Path -LiteralPath $AppIconPath) {
-    $form.Icon = New-Object System.Drawing.Icon($AppIconPath)
+if ($null -ne $script:appIcon) {
+    $form.Icon = $script:appIcon
 }
 $form.ShowInTaskbar = $true
 
@@ -783,6 +806,7 @@ $clockTimer.Add_Tick({
 })
 
 $form.Add_Shown({
+    Set-WindowIcon
     Update-StatusClock
     Update-UsageView
     $clockTimer.Start()
@@ -795,6 +819,9 @@ $form.Add_FormClosing({
     if ($null -ne $script:singleInstanceMutex) {
         $script:singleInstanceMutex.ReleaseMutex()
         $script:singleInstanceMutex.Dispose()
+    }
+    if ($null -ne $script:appIcon) {
+        $script:appIcon.Dispose()
     }
 })
 
