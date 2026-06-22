@@ -1,25 +1,78 @@
-# Codex 用量监控浮窗
+# Codex Usage Monitor
 
-Windows 上的 Codex Desktop 剩余额度浮窗。
+一个非官方的 Windows 桌面浮窗，用来查看 Codex Desktop 的剩余额度。
 
-使用桌面快捷方式 `Codex 用量监控` 启动。
+An unofficial Windows floating window for checking local Codex Desktop usage quota.
 
-额度数据每 10 秒刷新一次，窗口上的当前时间每秒刷新。
+## Features
 
-读取内容：
+- Shows primary and secondary quota windows with remaining percentage bars.
+- Updates quota data every 10 seconds.
+- Updates the clock every second.
+- Supports Chinese and English UI.
+- Stays on top by default, with a `Pin` toggle.
+- Reads local Codex data only; it does not write to Codex files and does not use auth tokens.
 
-- 只读 `%USERPROFILE%\.codex\logs_2.sqlite` 里的最新 `codex.rate_limits` 事件。
-- 同时读取 `%USERPROFILE%\.codex\sessions` 下 `rollout-*.jsonl` 里的最新 `token_count` 事件，并使用时间更新的一条。
-- 显示 `rate_limits.primary` 和 `rate_limits.secondary`。
-- 优先使用 `limit_id = codex` 的额度池。
+## Install
 
-说明：
+1. Download or clone this repository.
+2. Run PowerShell in the project folder:
 
-- 只读，不会修改 Codex 文件，也不会使用你的 auth token。
-- 大号数字显示两个限额窗口里更紧的剩余百分比。
-- 进度条显示剩余额度：满条表示未使用，额度消耗后会变短。
-- 剩余低于 20% 变黄，低于 5% 变红并弹出一次提醒。
-- 按住标题区域可以拖动窗口。
-- `EN/文` 按钮用于在英文和中文界面之间切换。
-- `顶` 按钮用于切换置顶。
-- 右键菜单可以打开日志文件夹或退出。
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\Install-Shortcut.ps1
+   ```
+
+3. Start it from the desktop shortcut `Codex Usage Monitor`.
+
+You can also run it directly:
+
+```powershell
+.\Start-CodexUsageMonitor.cmd
+```
+
+To remove the desktop shortcut:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Install-Shortcut.ps1 -Remove
+```
+
+## What It Reads
+
+- `%USERPROFILE%\.codex\logs_2.sqlite`
+  - latest `codex.rate_limits` events from Codex logs
+- `%USERPROFILE%\.codex\sessions\**\rollout-*.jsonl`
+  - latest `token_count` events as fallback/current-session data
+
+The app prefers the `limit_id = codex` quota pool when multiple pools are found.
+
+## Requirements
+
+- Windows
+- Codex Desktop with local logs under `%USERPROFILE%\.codex`
+- Windows PowerShell
+- Python, only for reading `logs_2.sqlite`
+  - The script first tries Codex's bundled Python runtime.
+  - If unavailable, it falls back to `python.exe` from `PATH`.
+
+## Privacy
+
+This tool is local-only and read-only.
+
+It does not:
+
+- send telemetry
+- call network APIs
+- modify Codex files
+- read or use Codex auth tokens
+
+## Usage Notes
+
+- Drag the title/status area to move the window.
+- Right-click the window to open the Codex log folder or exit.
+- The language button shows the target language: `EN` in Chinese UI, `文` in English UI.
+- The progress bars show remaining quota: full bar means unused, shorter bar means more quota has been consumed.
+- Remaining quota below 20% turns yellow; below 5% turns red and shows a one-time reminder.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

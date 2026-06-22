@@ -2,3 +2,7 @@
 *.tmp
 *.bak
 *.lnk
+__pycache__/
+screenshots/
+dist/
+*.zip

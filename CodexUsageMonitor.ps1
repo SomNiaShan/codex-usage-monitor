@@ -47,11 +47,9 @@ function T {
             "Pin" { return "Pin" }
             "OpenLogs" { return "Open log folder" }
             "Exit" { return "Exit" }
-            "PrimaryFallback" { return "Primary quota window" }
-            "SecondaryFallback" { return "Secondary quota window" }
+            "PrimaryFallback" { return "Primary" }
+            "SecondaryFallback" { return "Secondary" }
             "RemainingPrefix" { return "Remaining " }
-            "UsedResetUnknown" { return "Used -- / reset --" }
-            "UsedResetFormat" { return "Used {0} / {1}" }
             "ResetUnknown" { return "reset --" }
             "ResetFormat" { return "reset {0:MM-dd HH:mm}" }
             "QuotaLowTitle" { return "Codex quota reminder" }
@@ -70,11 +68,9 @@ function T {
         "Pin" { return U "\u9876" }
         "OpenLogs" { return U "\u6253\u5f00\u65e5\u5fd7\u6587\u4ef6\u5939" }
         "Exit" { return U "\u9000\u51fa" }
-        "PrimaryFallback" { return U "\u4e3b\u989d\u5ea6\u7a97\u53e3" }
-        "SecondaryFallback" { return U "\u6b21\u989d\u5ea6\u7a97\u53e3" }
+        "PrimaryFallback" { return U "\u4e3b\u989d\u5ea6" }
+        "SecondaryFallback" { return U "\u6b21\u989d\u5ea6" }
         "RemainingPrefix" { return U "\u5269\u4f59 " }
-        "UsedResetUnknown" { return U "\u5df2\u7528 -- / \u91cd\u7f6e --" }
-        "UsedResetFormat" { return U "\u5df2\u7528 {0} / {1}" }
         "ResetUnknown" { return U "\u91cd\u7f6e --" }
         "ResetFormat" { return (U "\u91cd\u7f6e") + " {0:MM-dd HH:mm}" }
         "QuotaLowTitle" { return "Codex " + (U "\u989d\u5ea6\u63d0\u9192") }
@@ -84,6 +80,42 @@ function T {
         default { return $Key }
     }
 }
+
+function Get-LanguageButtonText {
+    if ($script:uiLanguage -eq "en") {
+        return U "\u6587"
+    }
+
+    return "EN"
+}
+
+function Get-UiFontFamily {
+    $preferredFonts = @("Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI")
+    try {
+        $installedFonts = [System.Drawing.Text.InstalledFontCollection]::new().Families.Name
+        foreach ($font in $preferredFonts) {
+            if ($installedFonts -contains $font) {
+                return $font
+            }
+        }
+    }
+    catch {
+        return "Segoe UI"
+    }
+
+    return "Segoe UI"
+}
+
+function New-UiFont {
+    param(
+        [int]$Size = 9,
+        [System.Drawing.FontStyle]$Style = [System.Drawing.FontStyle]::Regular
+    )
+
+    return New-Object System.Drawing.Font($script:uiFontFamily, $Size, $Style)
+}
+
+$script:uiFontFamily = Get-UiFontFamily
 
 $AppTitle = "Codex " + (U "\u7528\u91cf\u76d1\u63a7")
 
@@ -154,26 +186,26 @@ function Format-WindowName {
     $minutes = [double]$WindowMinutes
     if ($minutes -ge 10080 -and ($minutes % 10080) -eq 0) {
         if ($script:uiLanguage -eq "en") {
-            return ("{0:N0}-week window" -f ($minutes / 10080))
+            return ("{0:N0}-week quota" -f ($minutes / 10080))
         }
-        return ("{0:N0}" -f ($minutes / 10080)) + (U " \u5468\u7a97\u53e3")
+        return ("{0:N0}{1}" -f ($minutes / 10080), (U "\u5468\u989d\u5ea6"))
     }
     if ($minutes -ge 1440 -and ($minutes % 1440) -eq 0) {
         if ($script:uiLanguage -eq "en") {
-            return ("{0:N0}-day window" -f ($minutes / 1440))
+            return ("{0:N0}-day quota" -f ($minutes / 1440))
         }
-        return ("{0:N0}" -f ($minutes / 1440)) + (U " \u5929\u7a97\u53e3")
+        return ("{0:N0}{1}" -f ($minutes / 1440), (U "\u5929\u989d\u5ea6"))
     }
     if ($minutes -ge 60 -and ($minutes % 60) -eq 0) {
         if ($script:uiLanguage -eq "en") {
-            return ("{0:N0}-hour window" -f ($minutes / 60))
+            return ("{0:N0}-hour quota" -f ($minutes / 60))
         }
-        return ("{0:N0}" -f ($minutes / 60)) + (U " \u5c0f\u65f6\u7a97\u53e3")
+        return ("{0:N0}{1}" -f ($minutes / 60), (U "\u5c0f\u65f6\u989d\u5ea6"))
     }
     if ($script:uiLanguage -eq "en") {
-        return ("{0:N0}-minute window" -f $minutes)
+        return ("{0:N0}-minute quota" -f $minutes)
     }
-    return ("{0:N0}" -f $minutes) + (U " \u5206\u949f\u7a97\u53e3")
+    return ("{0:N0}{1}" -f $minutes, (U "\u5206\u949f\u989d\u5ea6"))
 }
 
 function Get-PythonExecutable {
@@ -354,7 +386,7 @@ function New-Label {
     $label.Text = $Text
     $label.ForeColor = $Color
     $label.BackColor = [System.Drawing.Color]::FromArgb(21, 23, 26)
-    $label.Font = New-Object System.Drawing.Font("Segoe UI", $Size, $Style)
+    $label.Font = New-UiFont $Size $Style
     $label.AutoSize = $false
     return $label
 }
@@ -393,15 +425,35 @@ function Set-BarValue {
     $fill.BackColor = Pick-UsageColor $remaining
 }
 
+$windowWidth = 252
+$windowHeight = 190
+$outerPadding = 12
+$contentWidth = $windowWidth - ($outerPadding * 2)
+$buttonGap = 2
+$titleButtonGap = 6
+$closeButtonWidth = 20
+$pinButtonWidth = 34
+$languageButtonWidth = 32
+$topButtonHeight = 24
+$closeButtonX = $windowWidth - $outerPadding - $closeButtonWidth
+$pinButtonX = $closeButtonX - $buttonGap - $pinButtonWidth
+$languageButtonX = $pinButtonX - $buttonGap - $languageButtonWidth
+$titleWidth = $languageButtonX - $outerPadding - $titleButtonGap
+$valueWidth = 124
+$nameValueGap = 8
+$valueX = $windowWidth - $outerPadding - $valueWidth
+$nameWidth = $valueX - $outerPadding - $nameValueGap
+
 $form = New-Object System.Windows.Forms.Form
 $form.Text = $AppTitle
 $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
 $form.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
-$form.ClientSize = New-Object System.Drawing.Size(324, 190)
+$form.ClientSize = New-Object System.Drawing.Size($windowWidth, $windowHeight)
 $form.TopMost = $true
 $form.Opacity = 1.0
 $form.BackColor = [System.Drawing.Color]::FromArgb(21, 23, 26)
 $form.ForeColor = [System.Drawing.Color]::FromArgb(230, 235, 242)
+$form.Font = New-UiFont 9
 $form.ShowInTaskbar = $true
 
 $screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
@@ -415,26 +467,26 @@ $bad = [System.Drawing.Color]::FromArgb(248, 113, 113)
 $script:quotaAlertActive = $false
 $script:statusState = "Waiting"
 
-$title = New-Label 14 12 193 26 (T "Title") 12 ([System.Drawing.FontStyle]::Bold)
-$status = New-Label 14 39 234 18 (T "Waiting") 8 ([System.Drawing.FontStyle]::Regular) $muted
+$title = New-Label $outerPadding 12 $titleWidth 26 (T "Title") 12 ([System.Drawing.FontStyle]::Bold)
+$status = New-Label $outerPadding 39 $contentWidth 18 (T "Waiting") 8 ([System.Drawing.FontStyle]::Regular) $muted
 $close = New-Object System.Windows.Forms.Button
-$close.SetBounds(288, 12, 22, 24)
+$close.SetBounds($closeButtonX, 12, $closeButtonWidth, $topButtonHeight)
 $close.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $close.FlatAppearance.BorderSize = 0
 $close.Text = "x"
 $close.ForeColor = $muted
 $close.BackColor = [System.Drawing.Color]::FromArgb(31, 34, 38)
-$close.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+$close.Font = New-UiFont 9 ([System.Drawing.FontStyle]::Bold)
 $close.Add_Click({ $form.Close() })
 
 $languageButton = New-Object System.Windows.Forms.Button
-$languageButton.SetBounds(211, 12, 43, 24)
+$languageButton.SetBounds($languageButtonX, 12, $languageButtonWidth, $topButtonHeight)
 $languageButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $languageButton.FlatAppearance.BorderSize = 0
-$languageButton.Text = "EN/" + (U "\u6587")
+$languageButton.Text = Get-LanguageButtonText
 $languageButton.ForeColor = $muted
 $languageButton.BackColor = [System.Drawing.Color]::FromArgb(31, 34, 38)
-$languageButton.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Bold)
+$languageButton.Font = New-UiFont 8 ([System.Drawing.FontStyle]::Bold)
 $languageButton.Add_Click({
     $script:uiLanguage = if ($script:uiLanguage -eq "en") { "zh" } else { "en" }
     Update-StaticText
@@ -442,29 +494,29 @@ $languageButton.Add_Click({
 })
 
 $pin = New-Object System.Windows.Forms.Button
-$pin.SetBounds(257, 12, 29, 24)
+$pin.SetBounds($pinButtonX, 12, $pinButtonWidth, $topButtonHeight)
 $pin.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $pin.FlatAppearance.BorderSize = 0
 $pin.Text = T "Pin"
 $pin.ForeColor = $accent
 $pin.BackColor = [System.Drawing.Color]::FromArgb(31, 34, 38)
-$pin.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Bold)
+$pin.Font = New-UiFont 8 ([System.Drawing.FontStyle]::Bold)
 $pin.Add_Click({
     $form.TopMost = -not $form.TopMost
     $pin.ForeColor = if ($form.TopMost) { $accent } else { $muted }
 })
 
-$primaryName = New-Label 14 64 189 18 (Format-WindowName 300 (T "PrimaryFallback")) 9 ([System.Drawing.FontStyle]::Bold)
-$primaryValue = New-Label 196 64 113 18 "--" 9 ([System.Drawing.FontStyle]::Bold) $good
+$primaryName = New-Label $outerPadding 64 $nameWidth 18 (Format-WindowName 300 (T "PrimaryFallback")) 9 ([System.Drawing.FontStyle]::Bold)
+$primaryValue = New-Label $valueX 64 $valueWidth 18 "--" 9 ([System.Drawing.FontStyle]::Bold) $good
 $primaryValue.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
-$primaryBar = New-Bar 14 88 295
-$primaryDetail = New-Label 14 102 295 18 (T "UsedResetUnknown") 8 ([System.Drawing.FontStyle]::Regular) $muted
+$primaryBar = New-Bar $outerPadding 88 $contentWidth
+$primaryDetail = New-Label $outerPadding 102 $contentWidth 18 (T "ResetUnknown") 8 ([System.Drawing.FontStyle]::Regular) $muted
 
-$secondaryName = New-Label 14 128 189 18 (Format-WindowName 10080 (T "SecondaryFallback")) 9 ([System.Drawing.FontStyle]::Bold)
-$secondaryValue = New-Label 196 128 113 18 "--" 9 ([System.Drawing.FontStyle]::Bold) $good
+$secondaryName = New-Label $outerPadding 128 $nameWidth 18 (Format-WindowName 10080 (T "SecondaryFallback")) 9 ([System.Drawing.FontStyle]::Bold)
+$secondaryValue = New-Label $valueX 128 $valueWidth 18 "--" 9 ([System.Drawing.FontStyle]::Bold) $good
 $secondaryValue.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
-$secondaryBar = New-Bar 14 152 295
-$secondaryDetail = New-Label 14 166 295 18 (T "UsedResetUnknown") 8 ([System.Drawing.FontStyle]::Regular) $muted
+$secondaryBar = New-Bar $outerPadding 152 $contentWidth
+$secondaryDetail = New-Label $outerPadding 166 $contentWidth 18 (T "ResetUnknown") 8 ([System.Drawing.FontStyle]::Regular) $muted
 
 $form.Controls.AddRange(@(
     $title, $status, $close, $languageButton, $pin,
@@ -520,13 +572,13 @@ function Update-StaticText {
     $title.Text = T "Title"
     Update-StatusClock
     $pin.Text = T "Pin"
-    $languageButton.Text = "EN/" + (U "\u6587")
+    $languageButton.Text = Get-LanguageButtonText
     $openSessions.Text = T "OpenLogs"
     $exitItem.Text = T "Exit"
     $primaryName.Text = Format-WindowName 300 (T "PrimaryFallback")
     $secondaryName.Text = Format-WindowName 10080 (T "SecondaryFallback")
-    $primaryDetail.Text = T "UsedResetUnknown"
-    $secondaryDetail.Text = T "UsedResetUnknown"
+    $primaryDetail.Text = T "ResetUnknown"
+    $secondaryDetail.Text = T "ResetUnknown"
 }
 
 function Update-StatusClock {
@@ -649,8 +701,8 @@ function Update-UsageView {
         $secondaryValue.Text = "--"
         $primaryName.Text = Format-WindowName 300 (T "PrimaryFallback")
         $secondaryName.Text = Format-WindowName 10080 (T "SecondaryFallback")
-        $primaryDetail.Text = T "UsedResetUnknown"
-        $secondaryDetail.Text = T "UsedResetUnknown"
+        $primaryDetail.Text = T "ResetUnknown"
+        $secondaryDetail.Text = T "ResetUnknown"
         Set-BarValue $primaryBar $null
         Set-BarValue $secondaryBar $null
         return
@@ -682,12 +734,12 @@ function Update-UsageView {
 
     $primaryValue.Text = (T "RemainingPrefix") + (Format-Percent $primaryRemain)
     $primaryValue.ForeColor = Pick-UsageColor $primaryRemain
-    $primaryDetail.Text = ((T "UsedResetFormat") -f (Format-Percent $primaryUsed), (Format-ResetTime (Get-ResetEpoch $primary)))
+    $primaryDetail.Text = Format-ResetTime (Get-ResetEpoch $primary)
     Set-BarValue $primaryBar $primaryRemain
 
     $secondaryValue.Text = (T "RemainingPrefix") + (Format-Percent $secondaryRemain)
     $secondaryValue.ForeColor = Pick-UsageColor $secondaryRemain
-    $secondaryDetail.Text = ((T "UsedResetFormat") -f (Format-Percent $secondaryUsed), (Format-ResetTime (Get-ResetEpoch $secondary)))
+    $secondaryDetail.Text = Format-ResetTime (Get-ResetEpoch $secondary)
     Set-BarValue $secondaryBar $secondaryRemain
 
     $script:statusState = "Clock"
