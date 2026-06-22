@@ -26,10 +26,8 @@ The single-file launcher extracts the supporting files to `%LOCALAPPDATA%\CodexU
 
 - `%USERPROFILE%\.codex\logs_2.sqlite`
   - latest `codex.rate_limits` events from Codex logs
-- `%USERPROFILE%\.codex\sessions\**\rollout-*.jsonl`
-  - latest `token_count` events as fallback data when `codex.rate_limits` is unavailable
 
-The app prefers `codex.rate_limits` from `logs_2.sqlite`. Session `token_count` data is only a fallback.
+The app uses only `codex.rate_limits` from `logs_2.sqlite` as its quota data source.
 
 ## Requirements
 

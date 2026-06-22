@@ -133,7 +133,6 @@ if ($consoleWindow -ne [IntPtr]::Zero) {
 }
 
 $CodexRoot = Join-Path $env:USERPROFILE ".codex"
-$SessionsRoot = Join-Path $CodexRoot "sessions"
 $LogsDatabasePath = Join-Path $CodexRoot "logs_2.sqlite"
 $ScriptDirectory = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $RateLimitReaderPath = Join-Path $ScriptDirectory "Read-CodexRateLimits.py"
@@ -249,100 +248,6 @@ function Get-ResetEpoch {
     return $null
 }
 
-function Get-LatestSessionFile {
-    if (-not (Test-Path -LiteralPath $SessionsRoot)) {
-        return $null
-    }
-
-    return Get-ChildItem -LiteralPath $SessionsRoot -Filter "rollout-*.jsonl" -File -Recurse -ErrorAction SilentlyContinue |
-        Sort-Object LastWriteTimeUtc -Descending |
-        Select-Object -First 1
-}
-
-function Get-LastTokenCountEvent {
-    param($SessionFile)
-    if ($null -eq $SessionFile -or -not (Test-Path -LiteralPath $SessionFile.FullName)) {
-        return $null
-    }
-
-    $text = $null
-    $stream = $null
-    try {
-        $maxBytes = 1048576
-        $stream = [System.IO.File]::Open($SessionFile.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
-        $readBytes = [int][Math]::Min($maxBytes, $stream.Length)
-        $buffer = New-Object byte[] $readBytes
-        $null = $stream.Seek(-1 * $readBytes, [System.IO.SeekOrigin]::End)
-        $null = $stream.Read($buffer, 0, $readBytes)
-        $text = [System.Text.Encoding]::UTF8.GetString($buffer)
-    }
-    catch {
-        return $null
-    }
-    finally {
-        if ($null -ne $stream) {
-            $stream.Dispose()
-        }
-    }
-
-    $lines = $text -split "`n"
-
-    for ($i = $lines.Count - 1; $i -ge 0; $i--) {
-        $line = ([string]$lines[$i]).Trim()
-        if ($line.IndexOf('"token_count"', [System.StringComparison]::Ordinal) -lt 0) {
-            continue
-        }
-
-        try {
-            $event = $line | ConvertFrom-Json
-            if ($event.type -eq "event_msg" -and $event.payload.type -eq "token_count") {
-                return [pscustomobject]@{
-                    Event       = $event
-                    SessionFile = $SessionFile
-                }
-            }
-        }
-        catch {
-            continue
-        }
-    }
-
-    $fallbackStream = $null
-    $reader = $null
-    try {
-        $fallbackStream = [System.IO.File]::Open($SessionFile.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
-        $reader = New-Object System.IO.StreamReader($fallbackStream, [System.Text.Encoding]::UTF8)
-        $lastTokenLine = $null
-        while ($null -ne ($line = $reader.ReadLine())) {
-            if ($line.IndexOf('"token_count"', [System.StringComparison]::Ordinal) -ge 0) {
-                $lastTokenLine = $line
-            }
-        }
-        if ($null -ne $lastTokenLine) {
-            $event = $lastTokenLine | ConvertFrom-Json
-            if ($event.type -eq "event_msg" -and $event.payload.type -eq "token_count") {
-                return [pscustomobject]@{
-                    Event       = $event
-                    SessionFile = $SessionFile
-                }
-            }
-        }
-    }
-    catch {
-        return $null
-    }
-    finally {
-        if ($null -ne $reader) {
-            $reader.Dispose()
-        }
-        elseif ($null -ne $fallbackStream) {
-            $fallbackStream.Dispose()
-        }
-    }
-
-    return $null
-}
-
 function Get-LatestSqliteRateLimitEvent {
     if (-not (Test-Path -LiteralPath $LogsDatabasePath)) {
         return $null
@@ -374,7 +279,6 @@ function Get-LatestSqliteRateLimitEvent {
                     rate_limits = $snapshot.rate_limits
                 }
             }
-            SessionFile = $null
             Source      = "codex.rate_limits"
         }
     }
@@ -585,10 +489,10 @@ foreach ($target in $dragTargets) {
 }
 
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
-$openSessions = $menu.Items.Add((T "OpenLogs"))
-$openSessions.Add_Click({
-    if (Test-Path -LiteralPath $SessionsRoot) {
-        Start-Process explorer.exe -ArgumentList "`"$SessionsRoot`""
+$openLogs = $menu.Items.Add((T "OpenLogs"))
+$openLogs.Add_Click({
+    if (Test-Path -LiteralPath $CodexRoot) {
+        Start-Process explorer.exe -ArgumentList "`"$CodexRoot`""
     }
 })
 $exitItem = $menu.Items.Add((T "Exit"))
@@ -600,7 +504,7 @@ function Update-StaticText {
     Update-StatusClock
     $pin.Text = T "Pin"
     $languageButton.Text = Get-LanguageButtonText
-    $openSessions.Text = T "OpenLogs"
+    $openLogs.Text = T "OpenLogs"
     $exitItem.Text = T "Exit"
     $primaryName.Text = Format-WindowName 300 (T "PrimaryFallback")
     $secondaryName.Text = Format-WindowName 10080 (T "SecondaryFallback")
@@ -634,84 +538,14 @@ function Pick-UsageColor {
     return $good
 }
 
-function Get-LatestTokenCountEvent {
-    if (-not (Test-Path -LiteralPath $SessionsRoot)) {
-        return $null
-    }
-
-    $files = Get-ChildItem -LiteralPath $SessionsRoot -Filter "rollout-*.jsonl" -File -Recurse -ErrorAction SilentlyContinue |
-        Sort-Object LastWriteTimeUtc -Descending |
-        Select-Object -First 20
-
-    $candidates = @()
-    foreach ($file in $files) {
-        $tokenEvent = Get-LastTokenCountEvent $file
-        if ($null -ne $tokenEvent) {
-            $eventTime = [DateTimeOffset]::MinValue
-            try {
-                $eventTime = [DateTimeOffset]::Parse([string]$tokenEvent.Event.timestamp)
-            }
-            catch {
-                $eventTime = [DateTimeOffset]::MinValue
-            }
-
-            $limits = $tokenEvent.Event.payload.rate_limits
-            $primaryUsed = Convert-ToPercent $limits.primary.used_percent
-            $secondaryUsed = Convert-ToPercent $limits.secondary.used_percent
-            $remaining = $null
-            if ($null -ne $primaryUsed -and $null -ne $secondaryUsed) {
-                $remaining = 100.0 - [Math]::Max($primaryUsed, $secondaryUsed)
-            }
-
-            $candidates += [pscustomobject]@{
-                TokenEvent = $tokenEvent
-                EventTime  = $eventTime
-                LimitId    = [string]$limits.limit_id
-                Remaining  = $remaining
-            }
-        }
-    }
-
-    $codexCandidates = @($candidates | Where-Object { $_.LimitId -eq "codex" })
-    if ($codexCandidates.Count -gt 0) {
-        return ($codexCandidates | Sort-Object EventTime -Descending | Select-Object -First 1).TokenEvent
-    }
-
-    if ($candidates.Count -gt 0) {
-        return ($candidates | Sort-Object Remaining, EventTime | Select-Object -First 1).TokenEvent
-    }
-
-    return $null
-}
-
-function Get-EventTimestamp {
-    param($TokenEvent)
-
-    if ($null -eq $TokenEvent -or $null -eq $TokenEvent.Event -or $null -eq $TokenEvent.Event.timestamp) {
-        return [DateTimeOffset]::MinValue
-    }
-
-    try {
-        return [DateTimeOffset]::Parse([string]$TokenEvent.Event.timestamp)
-    }
-    catch {
-        return [DateTimeOffset]::MinValue
-    }
-}
-
 function Get-CurrentRateLimitEvent {
-    $rateLimitEvent = Get-LatestSqliteRateLimitEvent
-    if ($null -ne $rateLimitEvent) {
-        return $rateLimitEvent
-    }
-
-    return Get-LatestTokenCountEvent
+    return Get-LatestSqliteRateLimitEvent
 }
 
 function Update-UsageView {
-    $tokenEvent = Get-CurrentRateLimitEvent
+    $rateLimitEvent = Get-CurrentRateLimitEvent
 
-    if ($null -eq $tokenEvent) {
+    if ($null -eq $rateLimitEvent) {
         $script:statusState = "NoData"
         Update-StatusClock
         $status.ForeColor = $warn
@@ -726,7 +560,7 @@ function Update-UsageView {
         return
     }
 
-    $event = $tokenEvent.Event
+    $event = $rateLimitEvent.Event
     $limits = $event.payload.rate_limits
     $primary = $limits.primary
     $secondary = $limits.secondary
