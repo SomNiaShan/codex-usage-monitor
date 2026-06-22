@@ -17,11 +17,10 @@ This project is not affiliated with OpenAI. The bundled app icon is an original 
 
 ## Install
 
-1. Download the latest release zip.
-2. Extract it.
-3. Double-click `Launch-CodexUsageMonitor.vbs`.
+1. Download `CodexUsageMonitor.vbs` from the latest release.
+2. Double-click it.
 
-Release zips keep only `Launch-CodexUsageMonitor.vbs` at the top level. Supporting files live in the `app` folder. The launcher starts the monitor without flashing a console window.
+The single-file launcher extracts the supporting files to `%LOCALAPPDATA%\CodexUsageMonitor\app` and starts the monitor without flashing a console window.
 
 ## What It Reads
 
