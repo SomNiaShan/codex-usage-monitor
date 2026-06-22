@@ -396,7 +396,7 @@ $form = New-Object System.Windows.Forms.Form
 $form.Text = $AppTitle
 $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
 $form.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
-$form.ClientSize = New-Object System.Drawing.Size(324, 230)
+$form.ClientSize = New-Object System.Drawing.Size(324, 190)
 $form.TopMost = $true
 $form.Opacity = 1.0
 $form.BackColor = [System.Drawing.Color]::FromArgb(21, 23, 26)
@@ -452,24 +452,20 @@ $pin.Add_Click({
     $pin.ForeColor = if ($form.TopMost) { $accent } else { $muted }
 })
 
-$quotaName = New-Label 14 64 144 20 (T "QuotaName") 10 ([System.Drawing.FontStyle]::Bold)
-$quotaValue = New-Label 158 56 151 32 "--" 18 ([System.Drawing.FontStyle]::Bold) $good
-$quotaValue.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
-
-$primaryName = New-Label 14 100 189 18 (Format-WindowName 300 (T "PrimaryFallback")) 9 ([System.Drawing.FontStyle]::Bold)
-$primaryValue = New-Label 196 100 113 18 "--" 9 ([System.Drawing.FontStyle]::Bold) $good
+$primaryName = New-Label 14 64 189 18 (Format-WindowName 300 (T "PrimaryFallback")) 9 ([System.Drawing.FontStyle]::Bold)
+$primaryValue = New-Label 196 64 113 18 "--" 9 ([System.Drawing.FontStyle]::Bold) $good
 $primaryValue.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
-$primaryBar = New-Bar 14 124 295
-$primaryDetail = New-Label 14 138 295 18 (T "UsedResetUnknown") 8 ([System.Drawing.FontStyle]::Regular) $muted
+$primaryBar = New-Bar 14 88 295
+$primaryDetail = New-Label 14 102 295 18 (T "UsedResetUnknown") 8 ([System.Drawing.FontStyle]::Regular) $muted
 
-$secondaryName = New-Label 14 164 189 18 (Format-WindowName 10080 (T "SecondaryFallback")) 9 ([System.Drawing.FontStyle]::Bold)
-$secondaryValue = New-Label 196 164 113 18 "--" 9 ([System.Drawing.FontStyle]::Bold) $good
+$secondaryName = New-Label 14 128 189 18 (Format-WindowName 10080 (T "SecondaryFallback")) 9 ([System.Drawing.FontStyle]::Bold)
+$secondaryValue = New-Label 196 128 113 18 "--" 9 ([System.Drawing.FontStyle]::Bold) $good
 $secondaryValue.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
-$secondaryBar = New-Bar 14 188 295
-$secondaryDetail = New-Label 14 202 295 18 (T "UsedResetUnknown") 8 ([System.Drawing.FontStyle]::Regular) $muted
+$secondaryBar = New-Bar 14 152 295
+$secondaryDetail = New-Label 14 166 295 18 (T "UsedResetUnknown") 8 ([System.Drawing.FontStyle]::Regular) $muted
 
 $form.Controls.AddRange(@(
-    $title, $status, $close, $languageButton, $pin, $quotaName, $quotaValue,
+    $title, $status, $close, $languageButton, $pin,
     $primaryName, $primaryValue, $primaryBar, $primaryDetail,
     $secondaryName, $secondaryValue, $secondaryBar, $secondaryDetail
 ))
@@ -521,7 +517,6 @@ $form.ContextMenuStrip = $menu
 function Update-StaticText {
     $title.Text = T "Title"
     $status.Text = T "Waiting"
-    $quotaName.Text = T "QuotaName"
     $pin.Text = T "Pin"
     $languageButton.Text = "EN/" + (U "\u6587")
     $openSessions.Text = T "OpenLogs"
@@ -629,7 +624,6 @@ function Update-UsageView {
     if ($null -eq $tokenEvent) {
         $status.Text = T "NoData"
         $status.ForeColor = $warn
-        $quotaValue.Text = "--"
         $primaryValue.Text = "--"
         $secondaryValue.Text = "--"
         $primaryName.Text = Format-WindowName 300 (T "PrimaryFallback")
@@ -665,9 +659,6 @@ function Update-UsageView {
         $quotaRemain = $secondaryRemain
     }
 
-    $quotaValue.Text = Format-Percent $quotaRemain
-    $quotaValue.ForeColor = Pick-UsageColor $quotaRemain
-
     $primaryValue.Text = (T "RemainingPrefix") + (Format-Percent $primaryRemain)
     $primaryValue.ForeColor = Pick-UsageColor $primaryRemain
     $primaryDetail.Text = ((T "UsedResetFormat") -f (Format-Percent $primaryUsed), (Format-ResetTime (Get-ResetEpoch $primary)))
@@ -678,9 +669,7 @@ function Update-UsageView {
     $secondaryDetail.Text = ((T "UsedResetFormat") -f (Format-Percent $secondaryUsed), (Format-ResetTime (Get-ResetEpoch $secondary)))
     Set-BarValue $secondaryBar $secondaryRemain
 
-    $plan = if ($limits.plan_type) { $limits.plan_type } else { T "UnknownPlan" }
-    $limitId = if ($limits.limit_id) { $limits.limit_id } else { T "UnknownLimit" }
-    $status.Text = ("{0}/{1} | {2:HH:mm:ss}" -f $plan, $limitId, (Get-Date))
+    $status.Text = ("{0:HH:mm:ss}" -f (Get-Date))
     $status.ForeColor = $muted
 
     if ($null -ne $quotaRemain -and $quotaRemain -lt 5) {
